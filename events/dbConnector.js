@@ -28,17 +28,8 @@ class DbConnector {
 
                 const query = client.query('LISTEN profile_update');
                 client.on('notification', async (data) => {
-                    if(data.channel === 'profile_update'){
                         const payload = JSON.parse(data.payload);
                         this.handleNotification(client, payload);
-                        
-                    }else if(data.channel === 'account_update'){
-                        const payload = JSON.parse(data.payload);
-                        this.handleNotification(client, payload);
-
-                        
-                    }
-                   
                 });
 
 
