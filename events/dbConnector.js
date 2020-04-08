@@ -27,11 +27,20 @@ class DbConnector {
                 }
 
                 const query = client.query('LISTEN profile_update');
+                const query = client.query('LISTEN account_update');
                 client.on('notification', async (data) => {
+                    if(data.channel === 'profile_update'){
                         const payload = JSON.parse(data.payload);
-                        this.handleNotification(client, payload);
-                });
+                        this.handleNotification(client, payload,process.env.KAFKA_TOPIC);
+                        
+                    }else if(data.channel === 'account_update'){
+                        const payload = JSON.parse(data.payload);
+                        this.handleNotification(client, payload,process.env.KAFKA_ACCOUNT_TOPIC);
 
+                        
+                    }
+                   
+                });
 
                
             }
@@ -49,12 +58,26 @@ class DbConnector {
         if (recentUserUpdates.rows && recentUserUpdates.rows.length > 0) {
             console.log('Found %d user rows since last processing', recentUserUpdates.rows.length);
             recentUserUpdates.rows.forEach(row => {
-                this.handleNotification(client, row);
+                this.handleNotification(client, row,process.env.KAFKA_TOPIC);
             });
         }
         else {
             console.log('No contact rows found to update');
         }
+
+        // Querying the Account Updates
+        const recentAccountUpdates = await client.query('SELECT * FROM salesforce.account where systemmodstamp > $1 order by systemmodstamp desc', [lastProcess.last_event_process_date]);
+        if (recentAccountUpdates.rows && recentAccountUpdates.rows.length > 0) {
+            console.log('Found %d account rows since last processing', recentAccountUpdates.rows.length);
+            recentAccountUpdates.rows.forEach(row => {
+                this.handleNotification(client, row,process.env.KAFKA_ACCOUNT_TOPIC);
+            });
+        }
+        else {
+            console.log('No account rows found to update');
+        }
+
+
     }
 
     async updateLastProcessDate(client, recentContactRow) {
@@ -62,11 +85,11 @@ class DbConnector {
         await client.query('UPDATE event_process SET last_event_process_date = $1 WHERE last_event_process_date < $1', [lastModifiedDate]);
     }
 
-    async handleNotification(client, payload) { 
+    async handleNotification(client, payload,topicName) { 
         console.log('Row Updated: ', payload);
 
         producer.send({
-            topic: process.env.KAFKA_TOPIC,
+            topic:topicName,
             partition: 0,
             message: {
                 value: JSON.stringify(payload)
@@ -79,6 +102,7 @@ class DbConnector {
     }
 
 }
+
 
 module.exports = { DbConnector };
 
