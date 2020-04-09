@@ -27,7 +27,7 @@ class DbConnector {
                 }
 
                 const query = client.query('LISTEN profile_update');
-                const query = client.query('LISTEN account_update');
+                const accQuery = client.query('LISTEN account_update');
                 client.on('notification', async (data) => {
                     if(data.channel === 'profile_update'){
                         const payload = JSON.parse(data.payload);
