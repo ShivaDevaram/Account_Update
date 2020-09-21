@@ -1,14 +1,7 @@
-const consumer = require('./consumer.js');
 const producer = require('./producer.js');
-
 const db = require('../db');
 
-
 class DbConnector {
-
-    constructor() {
-
-    }
 
     init() {
         db.getStandaloneClient(async (client) => {
@@ -26,8 +19,8 @@ class DbConnector {
                     await client.query('INSERT INTO event_process(last_event_process_date) values ($1)', [now]);
                 }
 
-                const query = client.query('LISTEN profile_update');
-                const accQuery = client.query('LISTEN account_update');
+                const profileUpdateListener = client.query('LISTEN profile_update');
+                const accountUpdateListener = client.query('LISTEN account_update');
                 client.on('notification', async (data) => {
                     if(data.channel === 'profile_update'){
                         const payload = JSON.parse(data.payload);
@@ -36,20 +29,13 @@ class DbConnector {
                     }else if(data.channel === 'account_update'){
                         const payload = JSON.parse(data.payload);
                         this.handleNotification(client, payload,process.env.KAFKA_ACCOUNT_TOPIC);
-
-                        
                     }
-                   
                 });
-
-               
             }
             catch (err) {
                 console.error('Error while initializing DbConnector', err);
                 client.release();
             }
-
-
         });
     }
 
@@ -76,8 +62,6 @@ class DbConnector {
         else {
             console.log('No account rows found to update');
         }
-
-
     }
 
     async updateLastProcessDate(client, recentContactRow) {
@@ -85,11 +69,11 @@ class DbConnector {
         await client.query('UPDATE event_process SET last_event_process_date = $1 WHERE last_event_process_date < $1', [lastModifiedDate]);
     }
 
-    async handleNotification(client, payload,topicName) { 
-        console.log('Row Updated: ', payload);
+    async handleNotification(client, payload, topicName) { 
+        console.log('Row Updated: ', payload, topicName);
 
         producer.send({
-            topic:topicName,
+            topic: topicName,
             partition: 0,
             message: {
                 value: JSON.stringify(payload)
@@ -97,14 +81,8 @@ class DbConnector {
         }).catch(err => {
           console.error('Error while sending to topic, ' + err);
         });
-
         await this.updateLastProcessDate(client, payload);
     }
-
 }
 
-
 module.exports = { DbConnector };
-
-
-
